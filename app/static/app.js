@@ -94,9 +94,31 @@ function renderImportResults() {
     return;
   }
 
-  const { locations, restaurants, risk_tips: riskTips, source_url: sourceUrl } = state.importResult;
+  const { locations, restaurants, restaurant_details: details, risk_tips: riskTips, source_url: sourceUrl } = state.importResult;
   const sourceLabel =
     state.importResult.source_type === "xiaohongshu_link" ? "链接导入" : "手动导入";
+
+  const detailMap = {};
+  if (details) {
+    details.forEach((d) => { detailMap[d.name] = d; });
+  }
+
+  function renderRestaurantDetail(name) {
+    const d = detailMap[name];
+    if (!d) return `<li>${name}</li>`;
+    let lines = [`<strong>${d.name}</strong>`];
+    if (d.rating) lines.push(`⭐ ${d.rating}`);
+    if (d.avg_price) lines.push(`人均 ${d.avg_price}`);
+    if (d.phone) lines.push(`☎ ${d.phone}`);
+    if (d.address) lines.push(`${d.address}`);
+    let links = [];
+    if (d.meituan_url) links.push(`<a href="${d.meituan_url}" target="_blank" rel="noopener">美团</a>`);
+    if (d.dianping_url) links.push(`<a href="${d.dianping_url}" target="_blank" rel="noopener">点评</a>`);
+    if (links.length) lines.push(links.join(" · "));
+    if (d.queue_tip) lines.push(`⚠ ${d.queue_tip}`);
+    return `<li>${lines.join("<br>")}</li>`;
+  }
+
   importResults.className = "import-results";
   importResults.innerHTML = `
     <div class="import-summary">
@@ -112,8 +134,12 @@ function renderImportResults() {
         <ul>${renderList(locations, "未识别到明确地点")}</ul>
       </article>
       <article class="import-card">
-        <h4>餐厅</h4>
-        <ul>${renderList(restaurants, "未识别到明确餐厅")}</ul>
+        <h4>餐厅 (含高德搜索)</h4>
+        <ul>${
+          restaurants.length
+            ? restaurants.map(renderRestaurantDetail).join("")
+            : "<li>未识别到明确餐厅</li>"
+        }</ul>
       </article>
       <article class="import-card full">
         <h4>风险提示</h4>
@@ -299,6 +325,7 @@ async function importSource() {
       body: JSON.stringify({
         xiaohongshu_url: sourceUrl,
         note_text: noteText,
+        destination_city: (form.elements.namedItem("destination_city")?.value || "").trim() || null,
       }),
     });
     const data = await response.json();

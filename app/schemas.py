@@ -17,11 +17,13 @@ class HealthResponse(BaseModel):
 class SourceImportRequest(BaseModel):
     xiaohongshu_url: Optional[str] = None
     note_text: Optional[str] = None
+    destination_city: Optional[str] = None
 
     @model_validator(mode="after")
     def validate_source_input(self) -> "SourceImportRequest":
         self.xiaohongshu_url = (self.xiaohongshu_url or "").strip() or None
         self.note_text = (self.note_text or "").strip() or None
+        self.destination_city = (self.destination_city or "").strip() or None
         if not self.xiaohongshu_url and not self.note_text:
             raise ValueError("小红书链接和笔记文本至少填写一项")
         return self

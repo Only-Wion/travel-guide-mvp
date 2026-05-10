@@ -8,8 +8,9 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
+from app.connectors.amap import amap_place_search
 from app.connectors.deepseek import deepseek_parser
-from app.schemas import ParsedRiskTip, SourceImportRequest, SourceImportResponse
+from app.schemas import ParsedRiskTip, RestaurantDetail, SourceImportRequest, SourceImportResponse
 
 logger = logging.getLogger(__name__)
 
@@ -129,13 +130,47 @@ class SourceImporterService:
             logger.info("Using regex parse result (LLM unavailable or failed): %d locations, %d restaurants, %d tips",
                         len(locations), len(restaurants), len(risk_tips))
 
+        # Enrich restaurant info via Amap (Gaode)
+        destination_city = request.destination_city if hasattr(request, 'destination_city') else None
+        restaurant_details = self._enrich_restaurants_amap(restaurants, destination_city)
+
         return SourceImportResponse(
             source_type=source_type,
             source_url=source_url,
             locations=locations,
             restaurants=restaurants,
+            restaurant_details=restaurant_details,
             risk_tips=risk_tips,
         )
+
+    @staticmethod
+    def _enrich_restaurants_amap(
+        restaurants: List[str], city: Optional[str] = None
+    ) -> List[RestaurantDetail]:
+        """Search each restaurant via Amap API to get phone, rating, etc."""
+        if not restaurants or not amap_place_search.available:
+            return []
+        results: List[RestaurantDetail] = []
+        for name in restaurants:
+            search_city = city or "杭州"  # default to Hangzhou
+            detail = amap_place_search.search_restaurant(name, search_city)
+            if detail:
+                results.append(
+                    RestaurantDetail(
+                        name=name,  # Use the original short name so frontend can match it
+                        phone=detail.get("phone"),
+                        rating=detail.get("rating"),
+                        avg_price=detail.get("avg_price"),
+                        address=detail.get("address"),
+                        meituan_url=detail.get("meituan_url"),
+                        dianping_url=detail.get("dianping_url"),
+                        queue_tip=None,
+                    )
+                )
+            else:
+                # Still return a placeholder so the restaurant appears in results
+                results.append(RestaurantDetail(name=name))
+        return results
 
     @staticmethod
     def _try_llm_parse(text: str) -> Optional[dict]:

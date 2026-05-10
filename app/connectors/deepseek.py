@@ -174,7 +174,7 @@ class DeepSeekFoodSearch:
         """Search restaurant details via web search."""
         if not self.available:
             return None
-        query = f"在{city}搜索餐厅"{name}"的美团和大众点评信息，包括电话、评分、人均价格、地址、排队情况"
+        query = f'在{city}搜索餐厅"{name}"的美团和大众点评信息，包括电话、评分、人均价格、地址、排队情况'
         try:
             response = self.client.chat.completions.create(
                 model=DS_MODEL,
