@@ -13,14 +13,23 @@ const importStatus = document.getElementById("import-status");
 const importResults = document.getElementById("import-results");
 const xiaohongshuUrlInput = document.getElementById("xiaohongshu-url");
 const noteTextInput = document.getElementById("note-text");
+const desiredPlacesInput = document.getElementById("desired-places");
 
 function switchView(viewName) {
   document.querySelectorAll(".view").forEach((view) => {
     view.classList.toggle("active", view.id === `view-${viewName}`);
   });
+  // Re-trigger entrance animation
+  const activeView = document.getElementById(`view-${viewName}`);
+  if (activeView) {
+    activeView.style.animation = "none";
+    activeView.offsetHeight;
+    activeView.style.animation = "";
+  }
   document.querySelectorAll(".nav-link").forEach((button) => {
     button.classList.toggle("active", button.dataset.view === viewName);
   });
+  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 function renderDemoCases() {
@@ -31,9 +40,9 @@ function renderDemoCases() {
     card.className = "demo-card";
     card.innerHTML = `
       <h4>${item.title}</h4>
-      <p>${item.origin_city} -> ${item.destination_city}</p>
+      <p>${item.origin_city} → ${item.destination_city}</p>
       <p>预算 ¥${item.budget_cny} / ${item.travelers} 人</p>
-      <button class="secondary" data-demo-id="${item.id}">加载这个案例</button>
+      <button class="btn btn-secondary" data-demo-id="${item.id}">加载这个案例</button>
     `;
     container.appendChild(card);
   });
@@ -53,6 +62,13 @@ function fillForm(data) {
 
 function collectPayload() {
   const payload = Object.fromEntries(new FormData(form).entries());
+  const rawPlaces = desiredPlacesInput.value.trim();
+  const desiredPlaces = rawPlaces
+    ? rawPlaces
+        .split(/[\n,]+/)
+        .map((item) => item.trim())
+        .filter(Boolean)
+    : [];
   return {
     origin_city: payload.origin_city.trim(),
     destination_city: payload.destination_city.trim(),
@@ -67,6 +83,7 @@ function collectPayload() {
       .split(",")
       .map((item) => item.trim())
       .filter(Boolean),
+    desired_places: desiredPlaces,
   };
 }
 
@@ -83,11 +100,11 @@ function renderImportResults() {
   importResults.className = "import-results";
   importResults.innerHTML = `
     <div class="import-summary">
-      <span class="pill">${sourceLabel}</span>
+      <span class="pill pill-blue">${sourceLabel}</span>
       <strong>${locations.length}</strong> 个地点
       <strong>${restaurants.length}</strong> 家餐厅
       <strong>${riskTips.length}</strong> 条风险提示
-      ${sourceUrl ? `<small>来源链接：${sourceUrl}</small>` : "<small>未填写来源链接</small>"}
+      ${sourceUrl ? `<small class="text-small">来源链接：${sourceUrl}</small>` : '<small class="text-small">未填写来源链接</small>'}
     </div>
     <div class="import-grid result-grid">
       <article class="import-card">
@@ -127,51 +144,53 @@ function renderResults() {
   resultsGrid.innerHTML = state.response.plans
     .map(
       (plan) => `
-      <article class="panel plan-card">
-        <div class="plan-header">
-          <div>
-            <span class="pill">${plan.label}</span>
-            <h3>${plan.positioning}</h3>
+      <article class="card">
+        <div class="plan-card-body">
+          <div class="plan-header">
+            <div class="plan-header-left">
+              <span class="pill pill-blue">${plan.label}</span>
+              <h3>${plan.positioning}</h3>
+            </div>
+            <div class="plan-header-right">${plan.metrics.confidence_score} / 100<br />可信度</div>
           </div>
-          <div>${plan.metrics.confidence_score} / 100 可信度</div>
-        </div>
-        <p>${plan.summary}</p>
-        <div class="metric-grid">
-          <div class="metric">
-            总成本
-            <strong>¥${plan.metrics.total_cost_cny}</strong>
+          <p class="plan-summary">${plan.summary}</p>
+          <div class="metric-grid">
+            <div class="metric">
+              总成本
+              <strong>¥${plan.metrics.total_cost_cny}</strong>
+            </div>
+            <div class="metric">
+              风险分
+              <strong>${plan.metrics.risk_score}</strong>
+            </div>
           </div>
-          <div class="metric">
-            风险分
-            <strong>${plan.metrics.risk_score}</strong>
+          <div class="daily-list">
+            ${plan.daily_stops
+              .slice(0, 4)
+              .map(
+                (stop) => `
+                  <div class="daily-item">
+                    <strong>Day ${stop.day} ${stop.time_range} · ${stop.title}</strong>
+                    <div>${stop.highlight}</div>
+                  </div>
+                `
+              )
+              .join("")}
           </div>
-        </div>
-        <div class="daily-list">
-          ${plan.daily_stops
-            .slice(0, 4)
-            .map(
-              (stop) => `
-                <div class="daily-item">
-                  <strong>Day ${stop.day} ${stop.time_range} · ${stop.title}</strong>
-                  <div>${stop.highlight}</div>
-                </div>
-              `
-            )
-            .join("")}
-        </div>
-        <div class="source-list">
-          ${plan.source_references
-            .slice(0, 3)
-            .map(
-              (source) => `
-                <div class="source-item">
-                  <strong>${source.title}</strong>
-                  <div>${source.source} · 可信度 ${Math.round(source.confidence * 100)}%</div>
-                  <small>${source.updated_at}</small>
-                </div>
-              `
-            )
-            .join("")}
+          <div class="source-list">
+            ${plan.source_references
+              .slice(0, 3)
+              .map(
+                (source) => `
+                  <div class="source-item">
+                    <strong>${source.title}</strong>
+                    <div>${source.source} · 可信度 ${Math.round(source.confidence * 100)}%</div>
+                    <small class="text-small">${source.updated_at}</small>
+                  </div>
+                `
+              )
+              .join("")}
+          </div>
         </div>
       </article>
     `
@@ -184,26 +203,28 @@ function renderRisks() {
   riskPanels.innerHTML = state.response.plans
     .map(
       (plan) => `
-      <article class="panel plan-card">
-        <div class="plan-header">
-          <div>
-            <span class="pill">${plan.label}</span>
-            <h3>${plan.why_this_plan}</h3>
+      <article class="card">
+        <div class="plan-card-body">
+          <div class="plan-header">
+            <div class="plan-header-left">
+              <span class="pill pill-blue">${plan.label}</span>
+              <h3>${plan.why_this_plan}</h3>
+            </div>
           </div>
-        </div>
-        <p>${plan.decision_hint}</p>
-        <div class="risk-list">
-          ${plan.risks
-            .map(
-              (risk) => `
-                <div class="risk-item ${risk.level}">
-                  <strong>${risk.level.toUpperCase()} · ${risk.title}</strong>
-                  <p>${risk.description}</p>
-                  <small>用户取舍：${risk.user_tradeoff}</small>
-                </div>
-              `
-            )
-            .join("")}
+          <p class="plan-summary">${plan.decision_hint}</p>
+          <div class="risk-list">
+            ${plan.risks
+              .map(
+                (risk) => `
+                  <div class="risk-item ${risk.level}">
+                    <strong>${risk.level.toUpperCase()} · ${risk.title}</strong>
+                    <p>${risk.description}</p>
+                    <small>用户取舍：${risk.user_tradeoff}</small>
+                  </div>
+                `
+              )
+              .join("")}
+          </div>
         </div>
       </article>
     `
@@ -214,7 +235,7 @@ function renderRisks() {
 function renderCard() {
   if (!state.response) return;
   const card = state.response.execution_card;
-  executionCard.className = "panel execution-card-body";
+  executionCard.className = "card execution-card-body";
   executionCard.innerHTML = `
     <h3>${card.title}</h3>
     <p><strong>时间窗口：</strong>${card.trip_window}</p>
@@ -330,7 +351,7 @@ document.getElementById("print-card").addEventListener("click", () => {
   const popup = window.open("", "_blank");
   popup.document.write(`
     <html>
-      <head><title>执行卡</title><style>body{font-family:sans-serif;padding:24px;line-height:1.6}</style></head>
+      <head><title>执行卡</title><style>body{font-family:-apple-system,sans-serif;padding:24px;line-height:1.6;color:#1d1d1f}</style></head>
       <body>${state.response.execution_card.html_version}</body>
     </html>
   `);

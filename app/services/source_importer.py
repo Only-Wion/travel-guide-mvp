@@ -1,5 +1,6 @@
 import html
 import json
+import logging
 import re
 from collections import OrderedDict
 from typing import Iterable, List, Optional
@@ -7,7 +8,10 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
+from app.connectors.deepseek import deepseek_parser
 from app.schemas import ParsedRiskTip, SourceImportRequest, SourceImportResponse
+
+logger = logging.getLogger(__name__)
 
 
 PLACE_SUFFIXES = (
@@ -106,9 +110,25 @@ class SourceImportError(ValueError):
 class SourceImporterService:
     def import_manual_note(self, request: SourceImportRequest) -> SourceImportResponse:
         text, source_type, source_url = self._resolve_note_text(request)
-        locations = self._extract_locations(text)
-        restaurants = self._extract_restaurants(text)
-        risk_tips = self._extract_risk_tips(text)
+
+        # Try LLM-based parsing first (DeepSeek), fall back to regex
+        llm_result = self._try_llm_parse(text)
+        if llm_result:
+            locations = llm_result.get("locations", [])
+            restaurants = llm_result.get("restaurants", [])
+            risk_tips = [
+                ParsedRiskTip(level=tip["level"], content=tip["content"])
+                for tip in llm_result.get("risk_tips", [])
+            ]
+            logger.info("Using DeepSeek LLM parse result: %d locations, %d restaurants, %d tips",
+                        len(locations), len(restaurants), len(risk_tips))
+        else:
+            locations = self._extract_locations(text)
+            restaurants = self._extract_restaurants(text)
+            risk_tips = self._extract_risk_tips(text)
+            logger.info("Using regex parse result (LLM unavailable or failed): %d locations, %d restaurants, %d tips",
+                        len(locations), len(restaurants), len(risk_tips))
+
         return SourceImportResponse(
             source_type=source_type,
             source_url=source_url,
@@ -116,6 +136,22 @@ class SourceImporterService:
             restaurants=restaurants,
             risk_tips=risk_tips,
         )
+
+    @staticmethod
+    def _try_llm_parse(text: str) -> Optional[dict]:
+        """Try to parse note text using DeepSeek LLM.
+        Returns None if parsing fails or LLM is unavailable.
+        """
+        if not deepseek_parser.available:
+            return None
+        try:
+            result = deepseek_parser.parse_note(text)
+            # Only accept result if it contains at least some useful data
+            if result and (result.get("locations") or result.get("restaurants") or result.get("risk_tips")):
+                return result
+        except Exception:
+            logger.exception("LLM parse failed, falling back to regex")
+        return None
 
     def _resolve_note_text(self, request: SourceImportRequest) -> tuple[str, str, Optional[str]]:
         source_url = self._extract_source_url(request.xiaohongshu_url) if request.xiaohongshu_url else None

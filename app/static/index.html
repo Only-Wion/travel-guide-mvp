@@ -1,162 +1,205 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>自动旅行攻略 App</title>
-    <link rel="stylesheet" href="/static/styles.css" />
-  </head>
-  <body>
-    <div class="shell">
-      <aside class="sidebar">
-        <div class="brand">
-          <p class="eyebrow">V0 原型</p>
-          <h1>自动旅行攻略 App</h1>
-          <p>不是给你更多攻略，而是给你一份能出发的方案。</p>
-        </div>
-        <nav class="nav">
-          <button class="nav-link active" data-view="input">1. 输入页</button>
-          <button class="nav-link" data-view="results">2. 结果页</button>
-          <button class="nav-link" data-view="risks">3. 风险解释页</button>
-          <button class="nav-link" data-view="card">4. 执行卡页</button>
-        </nav>
-        <section class="demo-panel">
-          <div class="section-title">
-            <span>演示案例</span>
-            <button id="reload-demos" class="text-button">刷新</button>
-          </div>
-          <div id="demo-cases" class="demo-list"></div>
-        </section>
-      </aside>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>自动旅行攻略 App</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
 
-      <main class="content">
-        <section id="view-input" class="view active">
-          <header class="page-header">
-            <p class="eyebrow">输入页</p>
-            <h2>把一次复杂旅行描述清楚</h2>
-            <p>只采集会改变决策的字段，不做大而全档案系统。</p>
-          </header>
-
-          <section class="panel import-panel">
-            <div class="section-title import-title">
-              <span>小红书内容导入 MVP</span>
-              <small>支持贴链接自动导入；抓不到正文时，仍可手动粘贴笔记文本。</small>
-            </div>
-            <div class="import-grid">
-              <label>
-                小红书链接
-                <input
-                  id="xiaohongshu-url"
-                  placeholder="https://www.xiaohongshu.com/explore/..."
-                />
-                <small>支持纯链接，也支持直接粘贴手机端复制出来的整段分享文本。</small>
-              </label>
-              <label class="full">
-                笔记文本
-                <textarea
-                  id="note-text"
-                  rows="8"
-                  placeholder="可直接粘贴小红书笔记正文、清单、避雷提示；如果只填链接，也可以尝试自动导入"
-                ></textarea>
-              </label>
-            </div>
-            <div class="form-actions">
-              <button type="button" id="import-source" class="secondary">解析链接 / 笔记</button>
-              <span id="import-status" class="status-text">还没有导入内容。</span>
-            </div>
-            <div id="import-results" class="import-results empty">
-              解析结果会显示在这里，支持手动粘贴文本，或仅填写小红书链接。
-            </div>
-          </section>
-
-          <form id="planner-form" class="panel form-grid">
-            <label>
-              出发地
-              <input name="origin_city" required value="南京" />
-            </label>
-            <label>
-              目的地
-              <input name="destination_city" required value="杭州" />
-            </label>
-            <label>
-              出发日期
-              <input type="date" name="departure_date" required value="2026-05-01" />
-            </label>
-            <label>
-              返回日期
-              <input type="date" name="return_date" required value="2026-05-03" />
-            </label>
-            <label>
-              预算（元）
-              <input type="number" min="1" name="budget_cny" required value="2800" />
-            </label>
-            <label>
-              出行人数
-              <input type="number" min="1" max="9" name="travelers" value="2" />
-            </label>
-            <label>
-              偏好模式
-              <select name="preference_mode">
-                <option value="balanced">平衡优先</option>
-                <option value="budget_first">省钱优先</option>
-                <option value="peace_of_mind">省心优先</option>
-              </select>
-            </label>
-            <label>
-              最低中转缓冲（分钟）
-              <input type="number" min="0" max="720" name="min_transfer_buffer_minutes" value="60" />
-            </label>
-            <label class="checkbox-row">
-              <input type="checkbox" name="allow_night_arrival" />
-              <span>允许夜间到达</span>
-            </label>
-            <label class="full">
-              偏好标签
-              <input name="preferences" value="citywalk,local_food,light_pace" />
-              <small>用英文逗号分隔，例如 `citywalk,local_food`。</small>
-            </label>
-            <div class="form-actions full">
-              <button type="submit" class="primary">生成两套方案</button>
-              <button type="button" id="load-default" class="secondary">加载默认案例</button>
-              <span id="form-status" class="status-text"></span>
-            </div>
-          </form>
-        </section>
-
-        <section id="view-results" class="view">
-          <header class="page-header">
-            <p class="eyebrow">结果页</p>
-            <h2>两套方案必须明确不同</h2>
-            <p>左侧看省钱，右侧看省心。先看差异，再看细节。</p>
-          </header>
-          <div id="results-grid" class="two-col"></div>
-        </section>
-
-        <section id="view-risks" class="view">
-          <header class="page-header">
-            <p class="eyebrow">风险解释页</p>
-            <h2>让用户一眼看懂为什么更稳</h2>
-            <p>所有风险都来自规则，不来自模型猜测。</p>
-          </header>
-          <div id="risk-panels" class="two-col"></div>
-        </section>
-
-        <section id="view-card" class="view">
-          <header class="page-header">
-            <p class="eyebrow">执行卡页</p>
-            <h2>压缩成一页，旅行当天能直接拿出来用</h2>
-            <div class="header-actions">
-              <button id="copy-card" class="secondary">复制文本版</button>
-              <button id="print-card" class="primary">打印 / 导出 PDF</button>
-            </div>
-          </header>
-          <article id="execution-card" class="panel execution-card-empty">
-            先生成方案后再查看执行卡。
-          </article>
-        </section>
-      </main>
+  <!-- NAVIGATION BAR -->
+  <nav class="navbar">
+    <div class="navbar-inner">
+      <a class="nav-brand" href="/">
+        <div class="nav-brand-icon">✦</div>
+        <span class="nav-brand-text">旅行攻略</span>
+        <span class="nav-brand-badge">V0 原型</span>
+      </a>
+      <div class="nav-links">
+        <button class="nav-link active" data-view="input">输入</button>
+        <button class="nav-link" data-view="results">结果</button>
+        <button class="nav-link" data-view="risks">风险</button>
+        <button class="nav-link" data-view="card">执行卡</button>
+      </div>
     </div>
+  </nav>
 
-    <script src="/static/app.js"></script>
-  </body>
+  <!-- MAIN CONTENT -->
+  <div class="main-content">
+
+    <!-- ====== VIEW: INPUT ====== -->
+    <section id="view-input" class="view active">
+
+      <header class="page-hero">
+        <p class="page-hero-eyebrow">输入页</p>
+        <h1>把一次复杂旅行描述清楚</h1>
+        <p>只采集会改变决策的字段，不做大而全档案系统。</p>
+      </header>
+
+      <!-- Planner Form -->
+      <form id="planner-form" class="card">
+        <div class="section-header">
+          <p class="eyebrow">旅行方案</p>
+          <h2>告诉我你的出行需求</h2>
+        </div>
+        <div class="form-grid">
+          <label>
+            出发地
+            <input name="origin_city" class="form-input" required value="南京" />
+          </label>
+          <label>
+            目的地
+            <input name="destination_city" class="form-input" required value="杭州" />
+          </label>
+          <label>
+            出发日期
+            <input type="date" name="departure_date" class="form-input" required value="2026-05-01" />
+          </label>
+          <label>
+            返回日期
+            <input type="date" name="return_date" class="form-input" required value="2026-05-03" />
+          </label>
+          <label>
+            预算（元）
+            <input type="number" min="1" name="budget_cny" class="form-input" required value="2800" />
+          </label>
+          <label>
+            出行人数
+            <input type="number" min="1" max="9" name="travelers" class="form-input" value="2" />
+          </label>
+          <label>
+            偏好模式
+            <select name="preference_mode" class="form-select">
+              <option value="balanced">平衡优先</option>
+              <option value="budget_first">省钱优先</option>
+              <option value="peace_of_mind">省心优先</option>
+            </select>
+          </label>
+          <label>
+            最低中转缓冲（分钟）
+            <input type="number" min="0" max="720" name="min_transfer_buffer_minutes" class="form-input" value="60" />
+          </label>
+          <label class="checkbox-row">
+            <input type="checkbox" name="allow_night_arrival" />
+            <span>允许夜间到达</span>
+          </label>
+          <label class="full">
+            偏好标签
+            <input name="preferences" class="form-input" value="citywalk,local_food,light_pace" />
+            <small>用英文逗号分隔，例如 citywalk, local_food。</small>
+          </label>
+          <div class="form-actions full">
+            <button type="submit" class="btn btn-primary">生成两套方案</button>
+            <button type="button" id="load-default" class="btn btn-secondary">加载默认案例</button>
+            <span id="form-status" class="status-text"></span>
+          </div>
+        </div>
+      </form>
+
+      <!-- Desired Places Panel -->
+      <div class="card" style="margin-bottom: 20px;">
+        <div class="import-section-title">
+          <span>想去的地方</span>
+          <small>写下你种草的目的地、景点或区域，会融入出行方案。</small>
+        </div>
+        <div class="import-grid">
+          <label class="full">
+            想去的地方
+            <textarea
+              id="desired-places"
+              class="form-textarea"
+              rows="4"
+              placeholder="每行一个地点，例如：&#10;西湖&#10;灵隐寺&#10;河坊街&#10;或者用逗号分隔：西湖, 灵隐寺, 河坊街"
+            ></textarea>
+            <small>支持换行或逗号分隔，系统会自动识别并融入旅行方案。</small>
+          </label>
+        </div>
+      </div>
+
+      <!-- Import Panel -->
+      <div class="card" style="margin-bottom: 20px;">
+        <div class="import-section-title">
+          <span>小红书内容导入 MVP</span>
+          <small>支持贴链接自动导入；抓不到正文时，仍可手动粘贴笔记文本。</small>
+        </div>
+        <div class="import-grid">
+          <label>
+            小红书链接
+            <input
+              id="xiaohongshu-url"
+              class="form-input"
+              placeholder="https://www.xiaohongshu.com/explore/..."
+            />
+            <small class="text-small">支持纯链接，也支持直接粘贴手机端复制出来的整段分享文本。</small>
+          </label>
+          <label class="full">
+            笔记文本
+            <textarea
+              id="note-text"
+              class="form-textarea"
+              rows="6"
+              placeholder="可直接粘贴小红书笔记正文、清单、避雷提示；如果只填链接，也可以尝试自动导入"
+            ></textarea>
+          </label>
+        </div>
+        <div class="form-actions" style="margin-top: 16px;">
+          <button type="button" id="import-source" class="btn btn-secondary">解析链接 / 笔记</button>
+          <span id="import-status" class="status-text">还没有导入内容。</span>
+        </div>
+        <div id="import-results" class="import-results empty">
+          解析结果会显示在这里，支持手动粘贴文本，或仅填写小红书链接。
+        </div>
+      </div>
+
+      <!-- Demo Cases -->
+      <div class="card" style="margin-top: 20px;">
+        <div class="demo-section-title">
+          <span>演示案例</span>
+          <button id="reload-demos" class="btn btn-text">刷新</button>
+        </div>
+        <div id="demo-cases" class="demo-grid"></div>
+      </div>
+
+    </section>
+
+    <!-- ====== VIEW: RESULTS ====== -->
+    <section id="view-results" class="view">
+      <header class="page-hero">
+        <p class="page-hero-eyebrow">结果页</p>
+        <h1>两套方案必须明确不同</h1>
+        <p>左侧看省钱，右侧看省心。先看差异，再看细节。</p>
+      </header>
+      <div id="results-grid" class="two-col"></div>
+    </section>
+
+    <!-- ====== VIEW: RISKS ====== -->
+    <section id="view-risks" class="view">
+      <header class="page-hero">
+        <p class="page-hero-eyebrow">风险解释页</p>
+        <h1>让用户一眼看懂为什么更稳</h1>
+        <p>所有风险都来自规则，不来自模型猜测。</p>
+      </header>
+      <div id="risk-panels" class="two-col"></div>
+    </section>
+
+    <!-- ====== VIEW: EXECUTION CARD ====== -->
+    <section id="view-card" class="view">
+      <header class="page-hero">
+        <p class="page-hero-eyebrow">执行卡页</p>
+        <h1>压缩成一页，旅行当天能直接拿出来用</h1>
+        <div class="header-actions">
+          <button id="copy-card" class="btn btn-secondary">复制文本版</button>
+          <button id="print-card" class="btn btn-primary">打印 / 导出 PDF</button>
+        </div>
+      </header>
+      <article id="execution-card" class="card execution-card-empty">
+        先生成方案后再查看执行卡。
+      </article>
+    </section>
+
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
 </html>

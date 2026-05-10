@@ -32,11 +32,23 @@ class ParsedRiskTip(BaseModel):
     content: str
 
 
+class RestaurantDetail(BaseModel):
+    name: str
+    phone: Optional[str] = None
+    rating: Optional[str] = None
+    avg_price: Optional[str] = None
+    address: Optional[str] = None
+    meituan_url: Optional[str] = None
+    dianping_url: Optional[str] = None
+    queue_tip: Optional[str] = None
+
+
 class SourceImportResponse(BaseModel):
     source_type: Literal["xiaohongshu_manual", "xiaohongshu_link"]
     source_url: Optional[str] = None
     locations: List[str] = Field(default_factory=list)
     restaurants: List[str] = Field(default_factory=list)
+    restaurant_details: List[RestaurantDetail] = Field(default_factory=list)
     risk_tips: List[ParsedRiskTip] = Field(default_factory=list)
 
 
@@ -51,6 +63,7 @@ class TravelPlanGenerateRequest(BaseModel):
     min_transfer_buffer_minutes: int = Field(60, ge=0, le=720)
     travelers: int = Field(1, ge=1, le=9)
     preferences: List[str] = Field(default_factory=list)
+    desired_places: List[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def validate_cities(self) -> "TravelPlanGenerateRequest":
