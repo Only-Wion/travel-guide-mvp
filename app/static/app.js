@@ -288,9 +288,21 @@ function renderResults() {
               <strong>${plan.metrics.risk_score}</strong>
             </div>
           </div>
+          <div class="source-list">
+            ${(plan.route_segments || [])
+              .map(
+                (segment) => `
+                  <div class="source-item">
+                    <strong>${segment.leg_title}</strong>
+                    <div>${segment.depart_at} 路 ${segment.arrive_at}</div>
+                    <small class="text-small">${segment.summary}</small>
+                  </div>
+                `
+              )
+              .join("")}
+          </div>
           <div class="daily-list">
-            ${plan.daily_stops
-              .slice(0, 4)
+            ${(plan.daily_stops || [])
               .map(
                 (stop) => `
                   <div class="daily-item">
@@ -302,8 +314,7 @@ function renderResults() {
               .join("")}
           </div>
           <div class="source-list">
-            ${plan.source_references
-              .slice(0, 3)
+            ${(plan.source_references || [])
               .map(
                 (source) => `
                   <div class="source-item">

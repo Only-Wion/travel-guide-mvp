@@ -1,5 +1,7 @@
 from typing import Dict, List, Tuple
 
+from app.connectors.deepseek import deepseek_parser
+from app.connectors.deepseek_planner import deepseek_daily_stop_planner
 from app.connectors.factory import get_travel_connectors
 from app.schemas import (
     DailyStop,
@@ -219,9 +221,29 @@ class TravelPlannerService:
         city_bundle: Dict[str, object],
         label: str,
     ) -> List[DailyStop]:
+        xiaohongshu_result = deepseek_parser.get_last_parse_result(
+            destination_city=request.destination_city
+        )
+        deepseek_stops = deepseek_daily_stop_planner.build_daily_stops(
+            request,
+            city_bundle,
+            label,
+            xiaohongshu_result=xiaohongshu_result,
+        )
+        if deepseek_stops:
+            return deepseek_stops
+
+        return self._build_rule_based_daily_stops(request, city_bundle, label)
+
+    def _build_rule_based_daily_stops(
+        self,
+        request: TravelPlanGenerateRequest,
+        city_bundle: Dict[str, object],
+        label: str,
+    ) -> List[DailyStop]:
         attractions: List[Tuple[str, str]] = city_bundle["attractions"]
         food: List[Tuple[str, str]] = city_bundle["food"]
-        
+
         # 优先使用用户的 desired_places，补充系统推荐的景点
         prioritized_attractions = []
         if request.desired_places:
@@ -234,7 +256,7 @@ class TravelPlannerService:
                     prioritized_attractions.append(attraction)
         else:
             prioritized_attractions = attractions
-        
+
         pace_hint = (
             "慢节奏收拢动线"
             if label == "省心优先方案"
@@ -269,7 +291,11 @@ class TravelPlannerService:
             DailyStop(
                 day=2,
                 time_range="上午",
-                title=prioritized_attractions[1][0] if len(prioritized_attractions) > 1 else prioritized_attractions[0][0],
+                title=(
+                    prioritized_attractions[1][0]
+                    if len(prioritized_attractions) > 1
+                    else prioritized_attractions[0][0]
+                ),
                 category="attraction",
                 highlight="放在第二天核心时段，避免首日交通扰动。",
                 source_ids=["transport-peace-route"],
@@ -277,7 +303,15 @@ class TravelPlannerService:
             DailyStop(
                 day=2,
                 time_range="下午",
-                title=prioritized_attractions[2][0] if len(prioritized_attractions) > 2 else (prioritized_attractions[1][0] if len(prioritized_attractions) > 1 else prioritized_attractions[0][0]),
+                title=(
+                    prioritized_attractions[2][0]
+                    if len(prioritized_attractions) > 2
+                    else (
+                        prioritized_attractions[1][0]
+                        if len(prioritized_attractions) > 1
+                        else prioritized_attractions[0][0]
+                    )
+                ),
                 category="attraction",
                 highlight="与上午景点在同一片区，减少折返。",
                 source_ids=["rule-transfer-buffer"],
@@ -293,7 +327,9 @@ class TravelPlannerService:
             DailyStop(
                 day=3,
                 time_range="上午",
-                title=prioritized_attractions[min(3, len(prioritized_attractions) - 1)][0],
+                title=prioritized_attractions[min(3, len(prioritized_attractions) - 1)][
+                    0
+                ],
                 category="attraction",
                 highlight="离开前只放一个主要点位，给返程留缓冲。",
                 source_ids=["weather-forecast"],

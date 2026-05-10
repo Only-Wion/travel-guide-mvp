@@ -35,22 +35,12 @@ class DeepSeekTravelConnectors:
             logger.warning("DeepSeek not available, return empty city bundle")
             return self._default_city_bundle(request.destination_city)
 
-        # Build desired places section
-        desired_places_section = ""
-        if request.desired_places:
-            desired_list = "\n".join([f"  - {place}" for place in request.desired_places])
-            desired_places_section = f"""
-用户想去的地方（优先级最高，必须融入景点列表）：
-{desired_list}
-
-要求：必须优先将用户想去的地方融入 attractions 列表中，尽可能匹配这些地点。"""
-
         prompt = f"""你是一个旅行信息生成助手。根据目的地城市生成真实、有用的旅行信息。
 
 目的地：{request.destination_city}
 出发日期：{request.departure_date}
 返回日期：{request.return_date}
-出行人数：{request.travelers} 人{desired_places_section}
+出行人数：{request.travelers} 人
 
 请按 JSON 格式返回该城市的旅行信息：
 
@@ -79,7 +69,7 @@ class DeepSeekTravelConnectors:
 1. attractions 至少 4 条，每条包含名称和类型
 2. food 至少 3 条，包含真实存在的餐厅或当地美食
 3. hotel_area 选择交通便利、旅游集中的区域
-{"4. 必须优先使用用户想去的地方中的地点，确保至少 50% 的 attractions 来自用户的想去清单。" if request.desired_places else "4. "}
+4. attractions 和 food 优先选择真实存在、适合短途旅行的地点
 5. 只返回 JSON，不要任何解释文字"""
 
         try:

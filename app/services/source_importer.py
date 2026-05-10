@@ -115,6 +115,12 @@ class SourceImporterService:
         # Try LLM-based parsing first (DeepSeek), fall back to regex
         llm_result = self._try_llm_parse(text)
         if llm_result:
+            deepseek_parser.remember_parse_result(
+                llm_result,
+                destination_city=request.destination_city,
+                source_type=source_type,
+                source_url=source_url,
+            )
             locations = llm_result.get("locations", [])
             restaurants = llm_result.get("restaurants", [])
             risk_tips = [

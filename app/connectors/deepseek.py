@@ -1,3 +1,4 @@
+from copy import deepcopy
 import json
 import logging
 from typing import List, Optional
@@ -34,6 +35,7 @@ class DeepSeekNoteParser:
 
     def __init__(self) -> None:
         self._client: Optional[OpenAI] = None
+        self._last_parse_result: Optional[dict] = None
 
     @property
     def available(self) -> bool:
@@ -83,7 +85,10 @@ class DeepSeekNoteParser:
                 max_tokens=2000,
             )
             raw = response.choices[0].message.content or ""
-            return self._parse_response(raw)
+            result = self._parse_response(raw)
+            if result:
+                self.remember_parse_result(result)
+            return result
 
         except Exception as exc:
             logger.error("DeepSeek API call failed: %s", exc)
@@ -126,6 +131,42 @@ class DeepSeekNoteParser:
                     })
             result["risk_tips"] = tips
         return result
+
+    def remember_parse_result(
+        self,
+        result: dict,
+        *,
+        destination_city: Optional[str] = None,
+        source_type: Optional[str] = None,
+        source_url: Optional[str] = None,
+    ) -> None:
+        """Keep the latest useful Xiaohongshu parse result for later planning."""
+        if not result:
+            return
+        stored = deepcopy(result)
+        metadata = {
+            "destination_city": destination_city,
+            "source_type": source_type,
+            "source_url": source_url,
+        }
+        stored["_metadata"] = {
+            key: value for key, value in metadata.items() if value
+        }
+        self._last_parse_result = stored
+
+    def get_last_parse_result(
+        self,
+        *,
+        destination_city: Optional[str] = None,
+    ) -> Optional[dict]:
+        """Return the latest cached parse result, optionally scoped by city."""
+        if not self._last_parse_result:
+            return None
+        metadata = self._last_parse_result.get("_metadata", {})
+        cached_city = metadata.get("destination_city")
+        if destination_city and cached_city and cached_city != destination_city:
+            return None
+        return deepcopy(self._last_parse_result)
 
 
 # Singleton
