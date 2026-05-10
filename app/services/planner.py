@@ -1,6 +1,6 @@
 from typing import Dict, List, Tuple
 
-from app.connectors.mock_connectors import MockTravelConnectors
+from app.connectors.factory import get_travel_connectors
 from app.schemas import (
     DailyStop,
     PlanMetrics,
@@ -18,22 +18,28 @@ from app.services.source_reliability import SourceReliabilityService
 
 class TravelPlannerService:
     def __init__(self) -> None:
-        self.connectors = MockTravelConnectors()
+        self.connectors = get_travel_connectors()
         self.constraint_engine = ConstraintEngine()
         self.scoring_engine = ScoringEngine()
         self.source_service = SourceReliabilityService()
         self.exporter = ExecutionCardExporter()
 
-    def generate(self, request: TravelPlanGenerateRequest) -> TravelPlanGenerateResponse:
+    def generate(
+        self, request: TravelPlanGenerateRequest
+    ) -> TravelPlanGenerateResponse:
         city_bundle = self.connectors.load_city_bundle(request)
         transport_candidates = self.connectors.transport_candidates(request)
-        viable_candidates, risks_by_candidate = self.constraint_engine.evaluate_transport(
-            request, transport_candidates
+        viable_candidates, risks_by_candidate = (
+            self.constraint_engine.evaluate_transport(request, transport_candidates)
         )
         fallback_weather = city_bundle["weather"]["confidence"] < 0.7
 
         if not viable_candidates:
-            viable_candidates = [candidate for candidate in transport_candidates if candidate["transport_id"] != "budget-route"]
+            viable_candidates = [
+                candidate
+                for candidate in transport_candidates
+                if candidate["transport_id"] != "budget-route"
+            ]
 
         scored_candidates = self.scoring_engine.score_candidates(
             request,
@@ -47,8 +53,13 @@ class TravelPlannerService:
         budget_candidate = max(scored_candidates, key=lambda item: item["budget_score"])
         peace_candidate = max(scored_candidates, key=lambda item: item["peace_score"])
 
-        if budget_candidate["transport_id"] == peace_candidate["transport_id"] and len(scored_candidates) > 1:
-            peace_candidate = sorted(scored_candidates, key=lambda item: item["peace_score"], reverse=True)[1]
+        if (
+            budget_candidate["transport_id"] == peace_candidate["transport_id"]
+            and len(scored_candidates) > 1
+        ):
+            peace_candidate = sorted(
+                scored_candidates, key=lambda item: item["peace_score"], reverse=True
+            )[1]
 
         plans = [
             self._build_plan_option(
@@ -73,9 +84,16 @@ class TravelPlannerService:
             ),
         ]
 
-        recommended_plan = plans[1] if request.preference_mode == "peace_of_mind" else plans[0]
+        recommended_plan = (
+            plans[1] if request.preference_mode == "peace_of_mind" else plans[0]
+        )
         if request.preference_mode == "balanced":
-            recommended_plan = min(plans, key=lambda item: abs(item.metrics.total_cost_cny - request.budget_cny // 2))
+            recommended_plan = min(
+                plans,
+                key=lambda item: abs(
+                    item.metrics.total_cost_cny - request.budget_cny // 2
+                ),
+            )
 
         execution_card = self.exporter.build(request, recommended_plan)
 
@@ -157,7 +175,13 @@ class TravelPlannerService:
             total_cost_cny=int(candidate["cost_cny"]) + 1080,
             total_duration_minutes=int(candidate["duration_minutes"]) + 45,
             risk_score=max(20, 70 - len(risk_items) * 12),
-            confidence_score=int((candidate["reliability"] * 100 + city_bundle["weather"]["confidence"] * 100) / 2),
+            confidence_score=int(
+                (
+                    candidate["reliability"] * 100
+                    + city_bundle["weather"]["confidence"] * 100
+                )
+                / 2
+            ),
         )
 
         summary = (
@@ -197,7 +221,25 @@ class TravelPlannerService:
     ) -> List[DailyStop]:
         attractions: List[Tuple[str, str]] = city_bundle["attractions"]
         food: List[Tuple[str, str]] = city_bundle["food"]
-        pace_hint = "慢节奏收拢动线" if label == "省心优先方案" else "压缩停留时间，优先控制成本"
+        
+        # 优先使用用户的 desired_places，补充系统推荐的景点
+        prioritized_attractions = []
+        if request.desired_places:
+            # 将用户想去的地方添加到前面，类型标记为 "user_selected"
+            for place in request.desired_places:
+                prioritized_attractions.append((place, "user_selected"))
+            # 补充系统推荐的景点（避免重复）
+            for attraction in attractions:
+                if attraction[0] not in [p[0] for p in prioritized_attractions]:
+                    prioritized_attractions.append(attraction)
+        else:
+            prioritized_attractions = attractions
+        
+        pace_hint = (
+            "慢节奏收拢动线"
+            if label == "省心优先方案"
+            else "压缩停留时间，优先控制成本"
+        )
 
         return [
             DailyStop(
@@ -211,7 +253,7 @@ class TravelPlannerService:
             DailyStop(
                 day=1,
                 time_range="下午",
-                title=attractions[0][0],
+                title=prioritized_attractions[0][0],
                 category="attraction",
                 highlight=f"首日用 {pace_hint} 的方式进入城市状态。",
                 source_ids=["transport-balanced-route"],
@@ -227,7 +269,7 @@ class TravelPlannerService:
             DailyStop(
                 day=2,
                 time_range="上午",
-                title=attractions[1][0],
+                title=prioritized_attractions[1][0] if len(prioritized_attractions) > 1 else prioritized_attractions[0][0],
                 category="attraction",
                 highlight="放在第二天核心时段，避免首日交通扰动。",
                 source_ids=["transport-peace-route"],
@@ -235,7 +277,7 @@ class TravelPlannerService:
             DailyStop(
                 day=2,
                 time_range="下午",
-                title=attractions[2][0],
+                title=prioritized_attractions[2][0] if len(prioritized_attractions) > 2 else (prioritized_attractions[1][0] if len(prioritized_attractions) > 1 else prioritized_attractions[0][0]),
                 category="attraction",
                 highlight="与上午景点在同一片区，减少折返。",
                 source_ids=["rule-transfer-buffer"],
@@ -251,7 +293,7 @@ class TravelPlannerService:
             DailyStop(
                 day=3,
                 time_range="上午",
-                title=attractions[min(3, len(attractions) - 1)][0],
+                title=prioritized_attractions[min(3, len(prioritized_attractions) - 1)][0],
                 category="attraction",
                 highlight="离开前只放一个主要点位，给返程留缓冲。",
                 source_ids=["weather-forecast"],

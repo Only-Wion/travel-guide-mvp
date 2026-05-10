@@ -456,6 +456,96 @@ body {
   grid-column: 1 / -1;
 }
 
+/* ===== PLACE LIST ITEMS ===== */
+.place-list {
+  display: grid;
+  gap: 10px;
+}
+
+.import-place-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  background: #f9f9fb;
+  border: 1px solid var(--line-light);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  transition: var(--transition);
+}
+
+.import-place-item:hover {
+  background: #fbfbfd;
+  border-color: var(--line);
+}
+
+.import-place-item.restaurant-item {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.place-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  gap: 12px;
+}
+
+.place-name {
+  font-weight: 500;
+  color: var(--ink);
+  flex: 1;
+}
+
+.place-buttons {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.btn-small {
+  padding: 4px 10px !important;
+  font-size: 12px !important;
+  border-radius: 6px !important;
+  min-width: auto;
+  background: var(--accent-light) !important;
+  color: var(--accent) !important;
+  border: 1px solid transparent !important;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.btn-small:hover:not(:disabled) {
+  background: rgba(0, 113, 227, 0.12) !important;
+}
+
+.btn-small:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.restaurant-detail {
+  width: 100%;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line-light);
+  font-size: 13px;
+  color: var(--ink-secondary);
+  line-height: 1.5;
+}
+
+.restaurant-detail a {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.restaurant-detail a:hover {
+  color: var(--accent-hover);
+  text-decoration: underline;
+}
+
 /* ===== TWO COLUMN ===== */
 .two-col {
   display: grid;

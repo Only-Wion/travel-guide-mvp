@@ -87,6 +87,52 @@ function collectPayload() {
   };
 }
 
+function getDesiredPlacesList() {
+  const rawText = desiredPlacesInput.value.trim();
+  return rawText
+    ? rawText.split(/[\n,]+/).map((item) => item.trim()).filter(Boolean)
+    : [];
+}
+
+function isPlaceInDesired(placeName) {
+  return getDesiredPlacesList().includes(placeName);
+}
+
+function addToDesiredPlaces(placeName) {
+  const desired = getDesiredPlacesList();
+  if (!desired.includes(placeName)) {
+    desired.push(placeName);
+    desiredPlacesInput.value = desired.join("\n");
+    updateImportResultsButtons();
+  }
+}
+
+function removeFromDesiredPlaces(placeName) {
+  const desired = getDesiredPlacesList().filter((item) => item !== placeName);
+  desiredPlacesInput.value = desired.length ? desired.join("\n") : "";
+  updateImportResultsButtons();
+}
+
+function updateImportResultsButtons() {
+  // 更新所有导入结果中的地点/餐厅按钮状态
+  document.querySelectorAll("[data-place-item]").forEach((item) => {
+    const placeName = item.dataset.placeItem;
+    const isInDesired = isPlaceInDesired(placeName);
+    
+    const addBtn = item.querySelector(".add-to-desired-btn");
+    const removeBtn = item.querySelector(".remove-from-desired-btn");
+    
+    if (addBtn) {
+      addBtn.disabled = isInDesired;
+      addBtn.style.opacity = isInDesired ? "0.5" : "1";
+    }
+    if (removeBtn) {
+      removeBtn.disabled = !isInDesired;
+      removeBtn.style.opacity = !isInDesired ? "0.5" : "1";
+    }
+  });
+}
+
 function renderImportResults() {
   if (!state.importResult) {
     importResults.className = "import-results empty";
@@ -103,20 +149,58 @@ function renderImportResults() {
     details.forEach((d) => { detailMap[d.name] = d; });
   }
 
-  function renderRestaurantDetail(name) {
+  function renderLocationItem(location) {
+    const isInDesired = isPlaceInDesired(location);
+    return `
+      <div class="import-place-item" data-place-item="${location}">
+        <span class="place-name">${location}</span>
+        <div class="place-buttons">
+          <button type="button" class="btn btn-small add-to-desired-btn" 
+            ${isInDesired ? "disabled" : ""}
+            style="${isInDesired ? "opacity: 0.5;" : ""}">➕ 加入</button>
+          <button type="button" class="btn btn-small remove-from-desired-btn" 
+            ${!isInDesired ? "disabled" : ""}
+            style="${!isInDesired ? "opacity: 0.5;" : ""}">➖ 删除</button>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderRestaurantItem(name) {
     const d = detailMap[name];
-    if (!d) return `<li>${name}</li>`;
-    let lines = [`<strong>${d.name}</strong>`];
-    if (d.rating) lines.push(`⭐ ${d.rating}`);
-    if (d.avg_price) lines.push(`人均 ${d.avg_price}`);
-    if (d.phone) lines.push(`☎ ${d.phone}`);
-    if (d.address) lines.push(`${d.address}`);
-    let links = [];
-    if (d.meituan_url) links.push(`<a href="${d.meituan_url}" target="_blank" rel="noopener">美团</a>`);
-    if (d.dianping_url) links.push(`<a href="${d.dianping_url}" target="_blank" rel="noopener">点评</a>`);
-    if (links.length) lines.push(links.join(" · "));
-    if (d.queue_tip) lines.push(`⚠ ${d.queue_tip}`);
-    return `<li>${lines.join("<br>")}</li>`;
+    const isInDesired = isPlaceInDesired(name);
+    
+    let detailHtml = "";
+    if (d) {
+      let lines = [`<strong>${d.name}</strong>`];
+      if (d.rating) lines.push(`⭐ ${d.rating}`);
+      if (d.avg_price) lines.push(`人均 ${d.avg_price}`);
+      if (d.phone) lines.push(`☎ ${d.phone}`);
+      if (d.address) lines.push(`${d.address}`);
+      let links = [];
+      if (d.meituan_url) links.push(`<a href="${d.meituan_url}" target="_blank" rel="noopener">美团</a>`);
+      if (d.dianping_url) links.push(`<a href="${d.dianping_url}" target="_blank" rel="noopener">点评</a>`);
+      if (links.length) lines.push(links.join(" · "));
+      if (d.queue_tip) lines.push(`⚠ ${d.queue_tip}`);
+      detailHtml = `<div class="restaurant-detail">${lines.join("<br>")}</div>`;
+    }
+
+    return `
+      <div class="import-place-item restaurant-item" data-place-item="${name}">
+        <div class="place-header">
+          <span class="place-name">${name}</span>
+          <div class="place-buttons">
+            <button type="button" class="btn btn-small add-to-desired-btn" 
+              ${isInDesired ? "disabled" : ""}
+              style="${isInDesired ? "opacity: 0.5;" : ""}">➕ 加入</button>
+            <button type="button" class="btn btn-small remove-from-desired-btn" 
+              ${!isInDesired ? "disabled" : ""}
+              style="${!isInDesired ? "opacity: 0.5;" : ""}">➖ 删除</button>
+          </div>
+        </div>
+        ${detailHtml}
+      </div>
+    `;
   }
 
   importResults.className = "import-results";
@@ -131,15 +215,19 @@ function renderImportResults() {
     <div class="import-grid result-grid">
       <article class="import-card">
         <h4>地点</h4>
-        <ul>${renderList(locations, "未识别到明确地点")}</ul>
+        <div class="place-list">${
+          locations.length
+            ? locations.map(renderLocationItem).join("")
+            : '<div class="import-place-item">未识别到明确地点</div>'
+        }</div>
       </article>
       <article class="import-card">
         <h4>餐厅 (含高德搜索)</h4>
-        <ul>${
+        <div class="place-list">${
           restaurants.length
-            ? restaurants.map(renderRestaurantDetail).join("")
-            : "<li>未识别到明确餐厅</li>"
-        }</ul>
+            ? restaurants.map(renderRestaurantItem).join("")
+            : '<div class="import-place-item">未识别到明确餐厅</div>'
+        }</div>
       </article>
       <article class="import-card full">
         <h4>风险提示</h4>
@@ -156,13 +244,23 @@ function renderImportResults() {
       </article>
     </div>
   `;
-}
 
-function renderList(items, emptyText) {
-  if (!items.length) {
-    return `<li>${emptyText}</li>`;
-  }
-  return items.map((item) => `<li>${item}</li>`).join("");
+  // 绑定按钮事件
+  document.querySelectorAll(".add-to-desired-btn").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      const placeName = btn.closest("[data-place-item]").dataset.placeItem;
+      addToDesiredPlaces(placeName);
+    });
+  });
+
+  document.querySelectorAll(".remove-from-desired-btn").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      const placeName = btn.closest("[data-place-item]").dataset.placeItem;
+      removeFromDesiredPlaces(placeName);
+    });
+  });
 }
 
 function renderResults() {
@@ -387,5 +485,9 @@ document.getElementById("print-card").addEventListener("click", () => {
 });
 
 form.addEventListener("submit", generatePlan);
+
+// 监听"想去的地方"的变化，实时更新导入结果中的按钮状态
+desiredPlacesInput.addEventListener("input", updateImportResultsButtons);
+
 renderImportResults();
 loadDemoCases();
